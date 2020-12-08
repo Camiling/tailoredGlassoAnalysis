@@ -263,7 +263,7 @@ p.tcga <- dim(RNA.tcga)[2]
 
 # Create a prior weight matrix using the mRNA data
 set.seed(1234)
-rna.fit <- huge(RNA.tcga, nlambda = 35, method = "glasso")
+rna.fit <- huge::huge(RNA.tcga, nlambda = 35, method = "glasso")
 # Use STARS to construct a precision matrix for RNA data, which will be used to construct the weight matrix
 set.seed(12345)
 rna.select.stars <- huge::huge.select(rna.fit, criterion = "stars", stars.thresh = 0.05)
@@ -277,9 +277,9 @@ set.seed(1234)
 rppa.fit <- huge::huge(RPPA.tcga, nlambda = 35, method = "glasso")
 # Select lambda by StARS
 set.seed(12345)
-rppa.select.stars <- huge.select(rppa.fit, criterion = "stars", stars.thresh = 0.05)
+rppa.select.stars <- huge::huge.select(rppa.fit, criterion = "stars", stars.thresh = 0.05)
 lambda.rppa.stars <- rppa.select.stars$opt.lambda # Optimal lambda
-a.mat.rppa.stars <- graph.adjacency(rppa.select.stars$refit, mode = "undirected", diag = F) # Optimal graph
+a.mat.rppa.stars <- igraph::raph.adjacency(rppa.select.stars$refit, mode = "undirected", diag = F) # Optimal graph
 theta.rppa.stars <- rppa.select.stars$opt.icov # Optimal precision matrix
 
 
