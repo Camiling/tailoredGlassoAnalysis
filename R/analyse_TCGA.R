@@ -1,7 +1,7 @@
 # Dowload, preprocess and analyse TCGA data with the tailored graphical lasso
 
 # Neccessary additions
-remotes::install_github("Camiling/tailoredGlasso", auth_token = "c19521d5a82ba1a631ffa5de9a569924908c10e4", dependencies = TRUE, build_vignettes = TRUE)
+remotes::install_github("Camiling/tailoredGlasso", dependencies = TRUE, build_vignettes = TRUE)
 library(tailoredGlasso)
 library(huge)
 library(glasso)
@@ -481,7 +481,7 @@ get_and_print_edges <- function(a.mat, col.names) {
 # Print all the edges that the tailored graphical lasso found, and write to file
 edges.tcga <- get_and_print_edges(res.tcga.final$theta.opt != 0, colnames(RPPA.tcga))
 colnames(edges.tcga) <- c("Gene1", "Gene2")
-write.csv(edges.tcga, file = "Edge_lists/edgesTCGA", row.names = F)
+write.csv(edges.tcga, file = "Edge_lists/edgesTCGA.csv", row.names = F,quote=F)
 
 # Write the list of edges that the tailored graphical lasso was able to find, but not wglasso, to file
-write.csv(df.changed.rppa.tcga, file = "Edge_lists/edgesTCGA_unique", row.names = F)
+write.csv(df.changed.rppa.tcga, file = "Edge_lists/edgesTCGA_unique.csv", row.names = F,quote=F)

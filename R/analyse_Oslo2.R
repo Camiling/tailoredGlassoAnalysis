@@ -1,7 +1,7 @@
 # Download, preprocess and analyse the Oslo 2 data with the tailored graphical lasso
 
 # Neccessary additions
-remotes::install_github("Camiling/tailoredGlasso", auth_token = "c19521d5a82ba1a631ffa5de9a569924908c10e4", dependencies = TRUE, build_vignettes = TRUE)
+remotes::install_github("Camiling/tailoredGlasso", dependencies = TRUE, build_vignettes = TRUE)
 if (!requireNamespace("BiocManager", quietly = TRUE)) {
   install.packages("BiocManager")
 }
@@ -360,7 +360,10 @@ get_and_print_edges <- function(a.mat, col.names) {
 # Print all the edges that the tailored graphical lasso found, and write to file
 edges.oslo2 <- get_and_print_edges(res.oslo2.final$theta.opt != 0, colnames(OSLO2.RPPA))
 colnames(edges.oslo2) <- c("Gene1", "Gene2")
-write.csv(edges.oslo2, file = "Edge_lists/edgesOslo2", row.names = F)
+write.csv(edges.oslo2, file = "Edge_lists/edgesOslo2.csv", row.names = F,quote=F)
+
+df.changed.oslo2.print = df.changed.rppa.oslo2[2:nrow(df.changed.rppa.oslo2),]
+colnames(df.changed.oslo2.print) = c('Gene', 'Gene2')
 
 # Write the list of edges that the tailored graphical lasso was able to find, but not wglasso, to file
-write.csv(df.changed.rppa.oslo2, file = "Edge_lists/edgesOslo2_unique", row.names = F)
+write.csv(df.changed.oslo2.print, file = "Edge_lists/edgesOslo2_unique.xlxs", row.names = F,quote=F)
