@@ -340,16 +340,22 @@ colMeans(df.with.evidence.oslo2.removed[, 5:13])
 # We now write a list of all edges indentified by the tailored graphical lasso to a .csv file.
 # We also write a list of all edges that the tailored graphical lasso was able to find, but not wglasso, to file
 
-get_and_print_edges <- function(a.mat, col.names) {
+get_and_print_edges <- function(a.mat, col.names, theta.mat=NULL) {
   # Function for printing all the edges in a graph with a layout that can be inserted into a latex table.
   # Also returns a data frame containing the edges
   # a.mat:          the adjacency matrix
   # col.names:      the names of the nodes in the graph
-  a.mat[which(diag(rep(1, ncol(a.mat))) == 1, arr.ind = T)] <- 0
+  # theta.mat:      the precision matrix. If included, the signs of the partial correlations are included in the table as well
+  a.mat[which(diag(rep(1, ncol(a.mat))) == 1, arr.ind = T)] <- 0 # Make diagonal zero
   pairs <- which(a.mat[, ] == 1, arr.ind = T)
   df <- data.frame(t(apply(pairs, 1, sort))) # Sort so that the node in the pair whose name is first in the alphabet is first.
   df <- unique(df)
   names <- cbind(col.names[df[, 1]], col.names[df[, 2]])
+  if (!is.null(theta.mat)){
+    signs = sign(-cov2cor(theta.mat))[cbind(df[,1], df[,2])]
+    names = cbind(names, ifelse(signs==1, '+', '-'))
+    return(names)
+  }
   for (i in 1:nrow(names)) {
     cat(names[i, 1], " & ", names[i, 2], " \\\\ \n")
   }
@@ -362,8 +368,64 @@ edges.oslo2 <- get_and_print_edges(res.oslo2.final$theta.opt != 0, colnames(OSLO
 colnames(edges.oslo2) <- c("Gene1", "Gene2")
 write.csv(edges.oslo2, file = "Edge_lists/edgesOslo2.csv", row.names = F,quote=F)
 
+
 df.changed.oslo2.print = df.changed.rppa.oslo2[2:nrow(df.changed.rppa.oslo2),]
 colnames(df.changed.oslo2.print) = c('Gene', 'Gene2')
 
 # Write the list of edges that the tailored graphical lasso was able to find, but not wglasso, to file
 write.csv(df.changed.oslo2.print, file = "Edge_lists/edgesOslo2_unique.xlxs", row.names = F,quote=F)
+
+# Write list of edges to file for both wglasso and tailored, including sign of partial correlation: -------------------------------------------
+
+# Print all the edges that the tailored graphical lasso found, and write to file
+edges.oslo2.sign <- get_and_print_edges(res.oslo2.final$theta.opt != 0, colnames(OSLO2.RPPA),res.oslo2.final$theta.opt)
+colnames(edges.oslo2.sign) <- c("Gene1", "Gene2", "PartialCorr")
+write.csv(edges.oslo2.sign, file = "Edge_lists/edgesOslo2WithSigns.csv", row.names = F,quote=F)
+
+# Print all the edges that the weighted graphical lasso found, and write to file
+edges.oslo2.wglasso <- get_and_print_edges(fit.w.oslo2.final$wi != 0, colnames(OSLO2.RPPA), fit.w.oslo2.final$wi)
+colnames(edges.oslo2.wglasso) <- c("Gene1", "Gene2","PartialCorr")
+write.csv(edges.oslo2.wglasso, file = "Edge_lists/edgesWglassoOslo2WithSigns.csv", row.names = F,quote=F)
+
+
+# Write list of node degree for all genes -------------------------------------------
+
+deg.oslo2= igraph::degree(graph.oslo2) # graph.oslo2 is found from the final estimate
+deg.oslo2.sorted = sort(deg.oslo2, decreasing = T)
+write.csv(deg.oslo2.sorted, file = "Edge_lists/degreesOslo2.csv", row.names = T,quote=F)
+
+
+graph.w.oslo2 <- igraph::graph.adjacency(fit.w.oslo2.final$wi != 0, mode = "undirected", diag = F)
+V(graph.w.oslo2)$name <- colnames(OSLO2.RPPA)
+deg.w.oslo2.sorted <- sort(igraph::degree(graph.w.oslo2), decreasing=T)
+write.csv(deg.w.oslo2.sorted, file <- "Edge_lists/degreesWglassoOslo2.csv", row.names = T,quote=F)
+
+# Plot graphs of both wglasso and tailored, marking edges by the sign of their partial correlation -------------------------------------------
+
+# Plot graphs
+net.oslo2 <- network::network(igraph::as_adj(graph.oslo2))
+network.vertex.names(net.oslo2 ) <- V(graph.oslo2 )$name
+col.oslo2  = sign(-cov2cor(res.oslo2.final$theta.opt))
+diag(col.oslo2) = 0
+col.oslo2[which(col.oslo2==1, arr.ind = T)] = 'red'
+col.oslo2[which(col.oslo2==-1, arr.ind = T)] = 'blue'
+net.oslo2 %e% 'color' = col.oslo2
+set.seed(123456)
+GGally::ggnet2(net.oslo2,
+               node.size = 10, label.size = 2, edge.size = 0.6, node.label = V(graph.oslo2)$name, alpha = 0.6,
+               mode = "fruchtermanreingold", color = "maroon2", edge.color = "color"
+)
+
+net.w.oslo2 <- network::network(igraph::as_adj(graph.w.oslo2))
+network.vertex.names(net.w.oslo2) <- V(graph.w.oslo2)$name
+col.w.oslo2 = sign(-cov2cor(fit.w.oslo2.final$wi))
+diag(col.w.oslo2) = 0
+col.w.oslo2[which(col.w.oslo2==1, arr.ind = T)] = 'red'
+col.w.oslo2[which(col.w.oslo2==-1, arr.ind = T)] = 'blue'
+net.w.oslo2 %e% 'color' = col.w.oslo2
+set.seed(123456)
+GGally::ggnet2(net.w.oslo2,
+               node.size = 10, label.size = 2, edge.size = 0.6, node.label = V(graph.w.oslo2)$name, alpha = 0.6,
+               mode = "fruchtermanreingold", color = "maroon2", edge.color = "color"
+)
+

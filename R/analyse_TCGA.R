@@ -279,7 +279,7 @@ rppa.fit <- huge::huge(RPPA.tcga, nlambda = 35, method = "glasso")
 set.seed(12345)
 rppa.select.stars <- huge::huge.select(rppa.fit, criterion = "stars", stars.thresh = 0.05)
 lambda.rppa.stars <- rppa.select.stars$opt.lambda # Optimal lambda
-a.mat.rppa.stars <- igraph::raph.adjacency(rppa.select.stars$refit, mode = "undirected", diag = F) # Optimal graph
+a.mat.rppa.stars <- igraph::graph.adjacency(rppa.select.stars$refit, mode = "undirected", diag = F) # Optimal graph
 theta.rppa.stars <- rppa.select.stars$opt.icov # Optimal precision matrix
 
 
@@ -461,16 +461,22 @@ colMeans(df.with.evidence.tcga.removed[, 5:13])
 # We now write a list of all edges indentified by the tailored graphical lasso to a .csv file.
 # We also write a list of all edges that the tailored graphical lasso was able to find, but not wglasso, to file
 
-get_and_print_edges <- function(a.mat, col.names) {
+get_and_print_edges <- function(a.mat, col.names, theta.mat=NULL) {
   # Function for printing all the edges in a graph with a layout that can be inserted into a latex table.
   # Also returns a data frame containing the edges
   # a.mat:          the adjacency matrix
   # col.names:      the names of the nodes in the graph
-  a.mat[which(diag(rep(1, ncol(a.mat))) == 1, arr.ind = T)] <- 0
+  # theta.mat:      the precision matrix. If included, the signs of the partial correlations are included in the table as well
+  a.mat[which(diag(rep(1, ncol(a.mat))) == 1, arr.ind = T)] <- 0 # Make diagonal zero
   pairs <- which(a.mat[, ] == 1, arr.ind = T)
   df <- data.frame(t(apply(pairs, 1, sort))) # Sort so that the node in the pair whose name is first in the alphabet is first.
   df <- unique(df)
   names <- cbind(col.names[df[, 1]], col.names[df[, 2]])
+  if (!is.null(theta.mat)){
+    signs = sign(-cov2cor(theta.mat))[cbind(df[,1], df[,2])]
+    names = cbind(names, ifelse(signs==1, '+', '-'))
+    return(names)
+  }
   for (i in 1:nrow(names)) {
     cat(names[i, 1], " & ", names[i, 2], " \\\\ \n")
   }
@@ -485,3 +491,58 @@ write.csv(edges.tcga, file = "Edge_lists/edgesTCGA.csv", row.names = F,quote=F)
 
 # Write the list of edges that the tailored graphical lasso was able to find, but not wglasso, to file
 write.csv(df.changed.rppa.tcga, file = "Edge_lists/edgesTCGA_unique.csv", row.names = F,quote=F)
+
+# Write list of edges to file for both wglasso and tailored, including sign of partial correlation: -------------------------------------------
+
+# Print all the edges that the tailored graphical lasso found, and write to file
+edges.tcga.signed <- get_and_print_edges(res.tcga.final$theta.opt != 0, colnames(RPPA.tcga),res.tcga.final$theta.opt)
+colnames(edges.tcga.signed) <- c("Gene1", "Gene2", "PartialCorr")
+write.csv(edges.tcga.signed, file = "Edge_lists/edgesTCGAWithSigns.csv", row.names = F,quote=F)
+
+# Print all the edges that the weighted graphical lasso found, and write to file
+edges.tcga.wglasso <- get_and_print_edges(fit.w.tcga.final$wi!= 0, colnames(RPPA.tcga), fit.w.tcga.final$wi)
+colnames(edges.tcga.wglasso) <- c("Gene1", "Gene2","PartialCorr")
+write.csv(edges.tcga.wglasso, file = "Edge_lists/edgesWglassoTCGAWithSigns.csv", row.names = F,quote=F)
+
+
+# Write list of node degree for all genes -------------------------------------------
+
+deg.tcga = igraph::degree(graph.tcga)
+deg.tcga.sorted = sort(deg.tcga, decreasing = T)
+write.csv(deg.tcga.sorted, file = "Edge_lists/degreesTCGA.csv", row.names = T,quote=F)
+
+
+graph.w.tcga <- igraph::graph.adjacency(fit.w.tcga.final$wi != 0, mode = "undirected", diag = F)
+V(graph.w.tcga)$name <- colnames(RPPA.tcga)
+deg.w.tcga.sorted = sort(igraph::degree(graph.w.tcga), decreasing=T)
+write.csv(deg.w.tcga.sorted, file = "Edge_lists/degreesWglassoTCGA.csv", row.names = T,quote=F)
+
+# Plot graphs of both wglasso and tailored, marking edges by the sign of their partial correlation -------------------------------------------
+
+# Plot graphs
+net.tcga <- network::network(igraph::as_adj(graph.tcga))
+network.vertex.names(net.tcga) <- V(graph.tcga)$name
+col.tcga = sign(-cov2cor(res.tcga.final$theta.opt))
+diag(col.tcga) = 0
+col.tcga[which(col.tcga==1, arr.ind = T)] = 'red'
+col.tcga[which(col.tcga==-1, arr.ind = T)] = 'blue'
+net.tcga %e% 'color' = col.tcga 
+set.seed(123456)
+GGally::ggnet2(net.tcga,
+               node.size = 10, label.size = 2, edge.size = 0.6, node.label = V(graph.tcga)$name, alpha = 0.6,
+               mode = "fruchtermanreingold", color = "maroon2", edge.color = "color"
+)
+
+net.w.tcga <- network::network(igraph::as_adj(graph.w.tcga))
+network.vertex.names(net.w.tcga) <- V(graph.w.tcga)$name
+col.w.tcga = sign(-cov2cor(fit.w.tcga.final$wi))
+diag(col.w.tcga) = 0
+col.w.tcga[which(col.w.tcga==1, arr.ind = T)] = 'red'
+col.w.tcga[which(col.w.tcga==-1, arr.ind = T)] = 'blue'
+net.w.tcga %e% 'color' = col.w.tcga 
+set.seed(123456)
+GGally::ggnet2(net.w.tcga,
+               node.size = 10, label.size = 2, edge.size = 0.6, node.label = V(graph.w.tcga)$name, alpha = 0.6,
+               mode = "fruchtermanreingold", color = "maroon2", edge.color = "color"
+)
+
