@@ -1,0 +1,20 @@
+Package: espace
+Type: Package
+Title: Enhanced construction of gene regulatory networks using hub gene
+        information
+Version: 0.1
+Date: 2016-08-10
+Author: Donghyeon Yu <dyu3@kmu.ac.kr>
+        Johan Lim <johanlim@stats.snu.ac.kr>
+        Xinlei Wang <swang@mail.smu.edu>
+        Faming Liang <faliang@ufl.edu>
+        Guanghua Xiao <guanghua.xiao@utsouthwestern.edu>
+Maintainer: Donghyeon Yu <dyu3@kmu.ac.kr>
+Suggests: MASS
+Description: Extended Sparse PArtial Correlation Estimation method
+License: GPL (>= 2)
+URL: https://sites.google.com/site/dhyeonyu/software
+Packaged: 2016-08-11 06:07:53 UTC; Donghyeon
+NeedsCompilation: yes
+Repository: CRAN
+Date/Publication: 2016-08-10 13:00:00

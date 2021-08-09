@@ -11,8 +11,7 @@ library(ggplot2)
 library(gridExtra)
 library(GGally)
 library(network)
-
-# The below code requires functions found in 'simulation_study.R'
+source('simulation_functions.R')
 
 # Section: Case 1 ----------------------------------
 # No edges changed. Large cor (0.2) in true graph, same in prior. 
