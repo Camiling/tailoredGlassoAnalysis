@@ -22,7 +22,6 @@ library(readxl)
 
 # Section: download and preprocess data --------------------------------
 
-
 # Load mRNA Data set using Bioconductor
 
 tmp <- GEOquery::getGEO("GSE58212", GSEMatrix = TRUE, getGPL = TRUE)
@@ -248,7 +247,6 @@ ggplot2::ggplot(df.oslo2, aes(x = PartialCor)) +
 
 # Section: check results with STRING database --------------------------------------------------------
 
-
 # Function for making a data frame with the edges that are in one graph (mat1), but not the other (mat2)
 make.df.of.changed.edges <- function(mat1, mat2, colnam) {
   changes.ind <- which(mat1 != 0 & mat2 == 0, arr.ind = T)
@@ -283,6 +281,12 @@ STRING.output.oslo2.lost <- "https://string-db.org/cgi/generatetaskspecificdownl
 # STRING tells us:
 # STRING DATABASE" PPI enrichment p-value: < 1.0e-16, your network has significantly more interactions than expected"
 
+# How many edges do they disagree on vs how many are there in total?
+nrow(df.changed.rppa.oslo2)
+# 103 edges
+(sum(fit.w.oslo2.final$wi!=0)-p.oslo2)/2
+# 131 edges
+
 # The below uses the tsv file that STRING gives as output, which we saved above.
 
 # Check agreement with STRING results for tailored graphical lasso
@@ -310,6 +314,30 @@ colMeans(df.with.evidence.oslo2[, 5:13])
 # database_annotated                    automated_textmining                  combined_score
 # 0.303555556                           0.627333333                           0.801511111
 
+# Look at type of evidence, for Additional file 8
+evidence.frame.oslo2 = colSums(df.with.evidence.oslo2[,5:13]>=0.4)
+evidence.frame.oslo2
+#neighborhood_on_chromosome  gene_fusion             phylogenetic_cooccurrence                              homology 
+#                         0            0                                     0                                     5 
+#coexpression experimentally_determined_interaction                    database_annotated                  automated_textmining 
+#          13                                    16                                    15                                    39 
+#combined_score 
+#            45 
+
+# In total, 16 edges have experimentally determined interactions
+
+# Percentage of edges only in the tailored graphical lasso graph that have an experimentally determined interaction
+evidence.frame.oslo2['experimentally_determined_interaction']/nrow(df.changed.rppa.oslo2)
+# experimentally_determined_interaction 
+# 0.1553398 
+
+# Look at average score for experimentally_determined_interaction
+mean(df.with.evidence.oslo2[,'experimentally_determined_interaction'])
+# 0.3412
+
+# Look at average score for the experimentally_determined_interaction edges with evidence >= 0.4
+mean(df.with.evidence.oslo2[,'experimentally_determined_interaction'][which(df.with.evidence.oslo2[,'experimentally_determined_interaction']>=0.4)])
+# 0.6980625
 
 # Check agreement with STRING results for weighted graphical lasso
 STRING.rppa.oslo2.removed <- utils::read.csv(STRING.output.oslo2.lost, sep = "\t")
@@ -334,6 +362,31 @@ colMeans(df.with.evidence.oslo2.removed[, 5:13])
 # 0.07848276                            0.05175862                            0.22886207
 # database_annotated                    automated_textmining                  combined_score
 # 0.33103448                            0.53500000                            0.67006897
+
+# Look at type of evidence, for Additional file 8
+evidence.frame.oslo2.removed = colSums(df.with.evidence.oslo2.removed[,5:13]>=0.4)
+evidence.frame.oslo2.removed
+#neighborhood_on_chromosome                           gene_fusion             phylogenetic_cooccurrence                              homology 
+#                         0                                     0                                     0                                     3 
+#coexpression experimentally_determined_interaction                    database_annotated                  automated_textmining 
+#           0                                     6                                    11                                    22 
+#combined_score 
+#            29 
+
+# In total, 6 edges have experimentally determined interactions
+
+# Percentage of edges only in the weighted graphical lasso graph that have an experimentally determined interaction
+evidence.frame.oslo2.removed['experimentally_determined_interaction']/nrow(df.lost.rppa.oslo2)
+# experimentally_determined_interaction 
+# 0.05825243 
+
+# Look at average score for experimentally_determined_interaction
+mean(df.with.evidence.oslo2.removed[,'experimentally_determined_interaction'])
+# 0.2288621
+
+# Look at average score for the experimentally_determined_interaction edges with evidence >= 0.4
+mean(df.with.evidence.oslo2.removed[,'experimentally_determined_interaction'][which(df.with.evidence.oslo2.removed[,'experimentally_determined_interaction']>=0.4)])
+# 0.7663333
 
 # Write list of edges to file: -------------------------------------------
 
@@ -428,4 +481,58 @@ GGally::ggnet2(net.w.oslo2,
                node.size = 10, label.size = 2, edge.size = 0.6, node.label = V(graph.w.oslo2)$name, alpha = 0.6,
                mode = "fruchtermanreingold", color = "maroon2", edge.color = "color"
 )
+
+
+
+
+# Insert whole networks into STRING --------------------------
+lapply(colnames(OSLO2.RPPA), function(m) cat(m, "\n")) # insert into STRING
+
+
+# NOTE: to get all scores, not just the ones above 0.4, we select 'experimentally validated' only, and set the threshold to 0.05. 
+# Resulting STRING graph: https://version-11-0b.string-db.org/cgi/network?taskId=bmDtm7dlF5fL&sessionId=bTHNy98YL9Er
+# Since any score >=0.4 is considered evidence in STRING, it does not matter that we considered all evidence types earlier and not only exper. validated.  
+
+STRING.output.oslo2.full = 'https://version-11-0b.string-db.org/cgi/generatetaskspecificdownloadfile?taskId=bmDtm7dlF5fL&downloadDataFormat=tsv&downloadFileName=string_interactions.tsv'
+# Check agreement with STRING results for tailored graphical lasso
+STRING.rppa.oslo2.full <- utils::read.csv(STRING.output.oslo2.full, sep = "\t")
+# Sort so that gene pairs are given in alphabetical order.
+STRING.rppa.oslo2.full[, 1:2] <- t(apply(STRING.rppa.oslo2.full[, 1:2], 1, sort)) # First gene in alphabet is always in col 1
+colnames(STRING.rppa.oslo2.full)[1:2] <- c("Gene1", "Gene2")
+
+# Combine edges in STRING and in tailoredGlasso into one table, so that we can check how many edges occur twice in the
+#     table - this means they are present in both the STRING and the tailoredGlasso graph
+
+# use trick to get sorted list of all edges in the tailored graphical lasso graph
+df.rppa.oslo2 <- make.df.of.changed.edges(res.oslo2.final$theta.opt, diag(1,p.oslo2,p.oslo2), colnames(OSLO2.RPPA))
+df.all.edges.oslo2.full <- rbind(df.rppa.oslo2, STRING.rppa.oslo2.full[, 1:2])
+ids.in.STRING.full <- which(duplicated(df.all.edges.oslo2.full)) - nrow(df.rppa.oslo2) 
+
+# Get the mean number of edges that tailoredGlasso found which are present in the STRING list (NOT evidence, as threshold is so low). 
+sum(duplicated(df.all.edges.oslo2.full)) / nrow(df.rppa.oslo2)
+#  0.4351145
+
+# New data frame with information about edges with evidence in STRING
+df.with.evidence.oslo2.full <- STRING.rppa.oslo2.full[ids.in.STRING.full, ]
+df.exp.oslo2 = cbind(df.with.evidence.oslo2.full[,1:2], df.with.evidence.oslo2.full[,'experimentally_determined_interaction'])
+
+# Note that df.rppa.oslo2 and edges.oslo2.sign contain the exact same edges in the exact same order.
+
+
+val.vec.oslo2 = rep(0,nrow(edges.oslo2.sign))
+for (k in 1:nrow(df.exp.oslo2)){
+  for(j in 1:nrow(edges.oslo2.sign)){
+    if(sum(edges.oslo2.sign[j,1:2]==df.exp.oslo2[k,1:2])==2){
+      val.vec.oslo2[j] = df.exp.oslo2[k,3]
+    }
+  }
+}
+
+edges.oslo2.sign.score = cbind(edges.oslo2.sign, val.vec.oslo2)
+colnames(edges.oslo2.sign.score) = c(colnames(edges.oslo2.sign.score)[1:3], 'Score')
+edges.oslo2.sign.score
+write.csv(edges.oslo2.sign.score, file = "Edge_lists/edgesOslo2WithSignsAndScore.csv", row.names = F,quote=F)
+
+
+
 

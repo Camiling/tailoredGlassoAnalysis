@@ -404,6 +404,11 @@ STRING.output.tcga.lost <- "https://string-db.org/cgi/generatetaskspecificdownlo
 # STRING tells us:
 # STRING DATABASE" PPI enrichment p-value: < 1.0e-16, your network has significantly more interactions than expected"
 
+# How many edges do they disagree on vs how many are there in total?
+nrow(df.changed.rppa.tcga)
+# 289 edges
+(sum(res.tcga.final$theta.opt!=0)-p.tcga)/2
+# 456 edges
 
 
 # Check agreement with STRING results for tailored graphical lasso
@@ -431,6 +436,30 @@ colMeans(df.with.evidence.tcga[, 5:13])
 # combined_score
 # 0.7301075269
 
+# Look at type of evidence, for Additional file 8
+evidence.frame.tcga = colSums(df.with.evidence.tcga[,5:13]>=0.4)
+evidence.frame.tcga
+#neighborhood_on_chromosome                           gene_fusion             phylogenetic_cooccurrence                              homology 
+#                         0                                     0                                     1                                     8 
+#coexpression experimentally_determined_interaction                    database_annotated                  automated_textmining 
+#          11                                    19                                    22                                    78 
+#combined_score 
+#            93 
+
+# In total, 19 edges have experimentally determined interactions
+
+# Percentage of edges only in the tailored graphical lasso graph that have an experimentally determined interaction
+evidence.frame.tcga['experimentally_determined_interaction']/nrow(df.changed.rppa.tcga)
+#experimentally_determined_interaction 
+#                           0.06574394 
+
+# Look at average score for experimentally_determined_interaction
+mean(df.with.evidence.tcga[,'experimentally_determined_interaction'])
+# 0.2106559
+
+# Look at average score for the experimentally_determined_interaction edges with evidence >= 0.4
+mean(df.with.evidence.tcga[,'experimentally_determined_interaction'][which(df.with.evidence.tcga[,'experimentally_determined_interaction']>=0.4)])
+# 0.5993158
 
 # Check agreement with STRING results for weighted graphical lasso
 STRING.rppa.tcga.removed <- utils::read.csv(STRING.output.tcga.lost, sep = "\t")
@@ -455,6 +484,32 @@ colMeans(df.with.evidence.tcga.removed[, 5:13])
 # 0.078846154                              0.235596154                                 0.321153846                           0.457326923
 # combined_score
 # 0.740230769
+
+# Look at type of evidence, for Additional file 8
+evidence.frame.tcga.removed = colSums(df.with.evidence.tcga.removed[,5:13]>=0.4)
+evidence.frame.tcga.removed
+#neighborhood_on_chromosome                           gene_fusion             phylogenetic_cooccurrence                              homology 
+#                         0                                     0                                     0                                     3 
+#coexpression experimentally_determined_interaction                    database_annotated                  automated_textmining 
+#           1                                    11                                    19                                    29 
+#combined_score
+#            52 
+
+# In total, 11 edges have experimentally determined interactions
+
+
+# Percentage of edges only in the weighted graphical lasso graph that have an experimentally determined interaction
+evidence.frame.tcga.removed['experimentally_determined_interaction']/nrow(df.lost.rppa.tcga)
+#experimentally_determined_interaction 
+#                           0.03806228 
+
+# Look at average score for experimentally_determined_interaction
+mean(df.with.evidence.tcga.removed[,'experimentally_determined_interaction'])
+# 0.2355962
+
+# Look at average score for the experimentally_determined_interaction edges with evidence >= 0.4
+mean(df.with.evidence.tcga.removed[,'experimentally_determined_interaction'][which(df.with.evidence.tcga.removed[,'experimentally_determined_interaction']>=0.4)])
+# 0.5795455
 
 # Write list of edges to file: -------------------------------------------
 
@@ -545,4 +600,51 @@ GGally::ggnet2(net.w.tcga,
                node.size = 10, label.size = 2, edge.size = 0.6, node.label = V(graph.w.tcga)$name, alpha = 0.6,
                mode = "fruchtermanreingold", color = "maroon2", edge.color = "color"
 )
+
+
+# Insert whole networks into STRING --------------------------
+lapply(colnames(RPPA.tcga), function(m) cat(m, "\n")) # insert into STRING
+
+# NOTE: to get all scores, not just the ones above 0.4, we select 'experimentally validated' only, and set the threshold to 0.05. 
+# Resulting STRING graph: https://version-11-0b.string-db.org/cgi/network?taskId=bKbG9J8TUWjP&sessionId=bTHNy98YL9Er
+# Since any score >=0.4 is considered evidence in STRING, it does not matter that we considered all evidence types earlier and not only exper. validated.  
+
+STRING.output.tcga.full = 'https://version-11-0b.string-db.org/cgi/generatetaskspecificdownloadfile?taskId=bKbG9J8TUWjP&downloadDataFormat=tsv&downloadFileName=string_interactions.tsv'
+# Check agreement with STRING results for tailored graphical lasso
+STRING.rppa.tcga.full <- utils::read.csv(STRING.output.tcga.full, sep = "\t")
+# Sort so that gene pairs are given in alphabetical order.
+STRING.rppa.tcga.full[, 1:2] <- t(apply(STRING.rppa.tcga.full[, 1:2], 1, sort)) # First gene in alphabet is always in col 1
+colnames(STRING.rppa.tcga.full)[1:2] <- c("Gene1", "Gene2")
+
+# Combine edges in STRING and in tailoredGlasso into one table, so that we can check how many edges occur twice in the
+#     table - this means they are present in both the STRING and the tailoredGlasso graph
+
+# use trick to get sorted list of all edges in the tailored graphical lasso graph
+df.rppa.tcga <- make.df.of.changed.edges(res.tcga.final$theta.opt, diag(1,p.tcga,p.tcga), colnames(RPPA.tcga))
+df.all.edges.tcga.full <- rbind(df.rppa.tcga, STRING.rppa.tcga.full[, 1:2])
+ids.in.STRING.full.tcga <- which(duplicated(df.all.edges.tcga.full)) - nrow(df.rppa.tcga) 
+
+# Get the mean number of edges that tailoredGlasso found which are present in the STRING list (NOT evidence, as threshold is so low). 
+sum(duplicated(df.all.edges.tcga.full)) / nrow(df.rppa.tcga)
+# 0.3486842
+
+# New data frame with information about edges with evidence in STRING
+df.with.evidence.tcga.full <- STRING.rppa.tcga.full[ids.in.STRING.full.tcga, ]
+df.exp.tcga = cbind(df.with.evidence.tcga.full[,1:2], df.with.evidence.tcga.full[,'experimentally_determined_interaction'])
+
+
+val.vec.tcga = rep(0,nrow(edges.tcga.signed))
+for (k in 1:nrow(df.exp.tcga)){
+  for(j in 1:nrow(edges.tcga.signed)){
+    if(sum(edges.tcga.signed[j,1:2]==df.exp.tcga[k,1:2])==2){
+      val.vec.tcga[j] = df.exp.tcga[k,3]
+    }
+  }
+}
+
+edges.tcga.sign.score = cbind(edges.tcga.signed, val.vec.tcga)
+colnames(edges.tcga.sign.score) = c(colnames(edges.tcga.sign.score)[1:3], 'Score')
+edges.tcga.sign.score
+write.csv(edges.tcga.sign.score, file = "Edge_lists/edgesTCGAWithSignsAndScore.csv", row.names = F,quote=F)
+
 

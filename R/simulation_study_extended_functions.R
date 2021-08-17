@@ -1,5 +1,6 @@
 tailoredGlasso_simulation_extended = function(N,frac.to.mutate,true.cor,prior.cor,n,p, include.tailored=F, stars.thresh=0.05,ebic.gamma=0, ebic.gamma.space=0, 
-                                              ebic.gamma.espace=0, alpha.genenet=0.2, alpha.ns = 0.2, alpha.cmi2ni = 0.03, lambda.min.espace=20,seed=NULL){
+                                              ebic.gamma.espace=0, alpha.genenet=0.2, alpha.ns = 0.2, alpha.cmi2ni = 0.03, lambda.min.espace=20, n.lambda.espace=50,
+                                              seed=NULL){
   # Simulate N scale-free graphs with multivariate Gaussian data, and N sets of prior graphs and prior Gaussian graphical data,
   #       and reconstruct graphs using the tailored graphical lasso, the graphical lasso and the weighted graphical lasso. 
   #
@@ -114,7 +115,7 @@ tailoredGlasso_simulation_extended = function(N,frac.to.mutate,true.cor,prior.co
     res$space.recalls[i] = tailoredGlasso::recall(adj.true, fit.space$corr.mat!=0) 
     
     # Espace
-    fit.espace = espace.select.eBIC(X, graph.prior = prior.theta.est, ebic.gamma= ebic.gamma.espace, lambda.min=lambda.min.espace)
+    fit.espace = espace.select.eBIC(X, graph.prior = prior.theta.est, ebic.gamma= ebic.gamma.espace, lambda.min=lambda.min.espace, n.lambda=n.lambda.espace)
     res$espace.sparsities[i] = fit.espace$spars.opt
     res$espace.precisions[i] = tailoredGlasso::precision(adj.true, fit.espace$corr.mat!=0) 
     res$espace.recalls[i] = tailoredGlasso::recall(adj.true, fit.espace$corr.mat!=0) 
@@ -177,14 +178,14 @@ space.select.eBIC = function(X, ebic.gamma=0, lambda.min=20, lambda.max=100){
   return(list(mod.opt = mod.opt, corr.mat=mod.opt$ParCor, spars.opt = spars.opt,lambda.opt=lambda.opt))
 } 
 
-espace.select.eBIC = function(X, hubs.ind=NULL, graph.prior=NULL, ebic.gamma=0, alpha.min=0.001, alpha.max=1, lambda.min=20, lambda.max=100){
+espace.select.eBIC = function(X, hubs.ind=NULL, graph.prior=NULL, ebic.gamma=0, alpha.min=0.001, alpha.max=1, lambda.min=20, lambda.max=100, n.lambda=50){
   # Select alpha and lambda by eBIC
   # hubs.ind is the index of the hubs. Alternatively, a prior graph graph.prior can be provided. If so, we identify hubs as in espace paper
   # Use a grid as this is proposed in the paper, despite computational limitations
   # lambda from 20 and up, as in ordinary space 
   n = nrow(X)
   alpha.vals = seq(alpha.min, alpha.max, length.out = 20)
-  lambda.vals = seq(lambda.min,lambda.max, length.out = 50)
+  lambda.vals = seq(lambda.min,lambda.max, length.out = n.lambda)
   ebic.vals = matrix(NA,length(alpha.vals), length(lambda.vals)) # rows for alpha vals, cols for lambda vals
   if(is.null(hubs.ind)){
     espace.degree = igraph::degree(igraph::graph.adjacency(graph.prior!=0, mode='undirected', diag=F))
@@ -208,8 +209,8 @@ espace.select.eBIC = function(X, hubs.ind=NULL, graph.prior=NULL, ebic.gamma=0, 
       }
       # If sparsity zero for smallest alpha is reached, terminate
       if(j == 1 & sparsity(res.espace$rho!=0) == 0){
-        ebic.vals = ebic.vals[,1:i]
-        lambda.vals = lambda.vals[1:i]
+        ebic.vals = ebic.vals[,1:(i-1)]
+        lambda.vals = lambda.vals[1:(i-1)]
         done = T
         break()
       }
@@ -217,7 +218,7 @@ espace.select.eBIC = function(X, hubs.ind=NULL, graph.prior=NULL, ebic.gamma=0, 
     }
     if(done) break()
   }
-  ind.opt = which(ebic.vals==min(ebic.vals), arr.ind=T)
+  ind.opt = which(ebic.vals==min(ebic.vals, na.rm=T), arr.ind=T)
   alpha.opt = alpha.vals[ind.opt[,1]]
   lambda.opt = lambda.vals[ind.opt[,2]]
   mod.opt = espace::espace(X,hubs.ind, alpha=alpha.opt, lambda=lambda.opt)
